@@ -3,76 +3,78 @@ package com.mirror.tvreceiver
 import android.os.Bundle
 import android.util.Log
 import android.view.View
-import android.view.ViewGroup.LayoutParams.MATCH_PARENT
 import android.view.WindowManager
-import android.widget.FrameLayout
+import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import org.webrtc.EglBase
 import org.webrtc.SurfaceViewRenderer
 
 class MainActivity : AppCompatActivity(), WebRTCClient.Listener {
 
-    private lateinit var remoteRenderer: SurfaceViewRenderer
     private lateinit var eglBase: EglBase
-    private var webRtcClient: WebRTCClient? = null
-    private val signalingUrl: String by lazy { BuildConfig.SIGNALING_URL }
+    private lateinit var surfaceViewRenderer: SurfaceViewRenderer
+    private lateinit var statusText: TextView
+    private var client: WebRTCClient? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // Inflate a simple layout in code so we don't need XML yet
+        val root = View.inflate(this, R.layout.activity_main, null)
+        setContentView(root)
+
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
-        remoteRenderer = SurfaceViewRenderer(this).apply {
-            layoutParams = FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT)
-            keepScreenOn = true
-            systemUiVisibility = (
-                View.SYSTEM_UI_FLAG_FULLSCREEN or
-                View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or
-                View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
-            )
-        }
+        surfaceViewRenderer = findViewById(R.id.video_view)
+        statusText = findViewById(R.id.status_text)
 
-        setContentView(remoteRenderer)
-
+        // Initialize EGL + WebRTC surface
         eglBase = EglBase.create()
-        remoteRenderer.init(eglBase.eglBaseContext, null)
-        remoteRenderer.setEnableHardwareScaler(true)
-        remoteRenderer.setMirror(false)
+        surfaceViewRenderer.init(eglBase.eglBaseContext, null)
+        surfaceViewRenderer.setEnableHardwareScaler(true)
+        surfaceViewRenderer.setMirror(false)
 
-        webRtcClient = WebRTCClient(
+        // SIGNALING_URL is built from Gradle (see app/build.gradle)
+        val signalingUrl = BuildConfig.SIGNALING_URL
+        client = WebRTCClient(
             context = this,
-            eglBaseContext = eglBase.eglBaseContext,
-            remoteRenderer = remoteRenderer,
+            eglBase = eglBase,
             signalingUrl = signalingUrl,
             listener = this
-        )
+        ).also { it.attachRenderer(surfaceViewRenderer) }
+
+        onStatusChanged("Ready")
     }
 
     override fun onStart() {
         super.onStart()
-        webRtcClient?.connect()
+        client?.connect()
     }
 
     override fun onStop() {
-        webRtcClient?.disconnect()
         super.onStop()
+        client?.disconnect()
     }
 
     override fun onDestroy() {
-        webRtcClient?.release()
-        remoteRenderer.release()
-        eglBase.release()
         super.onDestroy()
+        try {
+            client?.release()
+        } catch (t: Throwable) {
+            Log.w("MainActivity", "Error releasing WebRTCClient", t)
+        }
+        surfaceViewRenderer.release()
+        eglBase.release()
     }
 
-    override fun onStatusChanged(status: WebRTCClient.Status) {
-        Log.d(TAG, "WebRTC status = $status (signaling: $signalingUrl)")
+    override fun onStatusChanged(status: String) {
+        runOnUiThread {
+            statusText.text = status
+        }
     }
 
     override fun onError(error: Throwable) {
-        Log.e(TAG, "WebRTC failure", error)
-    }
-
-    companion object {
-        private const val TAG = "MainActivity"
+        Log.e("MainActivity", "WebRTC failure", error)
+        onStatusChanged("Error: ${error.message}")
     }
 }

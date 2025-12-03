@@ -3,6 +3,7 @@ plugins {
     id 'kotlin-android'
 }
 
+// Configurable signaling URL: override with -Pmirror.signalingUrl=wss://...
 def signalingUrl = (project.findProperty("mirror.signalingUrl") ?: "wss://signaling.mirror.tv/ws") as String
 
 android {
@@ -17,6 +18,7 @@ android {
         versionName "1.0"
     }
 
+    // TV vs Chromebook flavors
     flavorDimensions "deviceType"
     productFlavors {
         tv {
@@ -29,6 +31,7 @@ android {
 
     buildTypes {
         debug {
+            // WebRTC client reads BuildConfig.SIGNALING_URL
             buildConfigField "String", "SIGNALING_URL", "\"${signalingUrl}\""
         }
         release {
@@ -55,9 +58,13 @@ android {
 dependencies {
     implementation 'androidx.core:core-ktx:1.12.0'
     implementation 'androidx.appcompat:appcompat:1.6.1'
+
+    // Signaling WebSocket client
     implementation 'com.squareup.okhttp3:okhttp:4.12.0'
+
+    // WebRTC native library
     implementation 'org.webrtc:google-webrtc:1.0.32010'
 
-    // Leanback UI components are only required for the dedicated TV flavor
+    // Only the TV flavor actually needs Leanback UI
     tvImplementation 'androidx.leanback:leanback:1.1.0-rc01'
 }

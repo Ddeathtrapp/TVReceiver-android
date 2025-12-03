@@ -6,7 +6,7 @@
     <uses-feature
         android:name="android.software.leanback"
         android:required="false"
-        tools:node="replace" />
+        tools:replace="android:required" />
 
     <application
         tools:replace="android:banner"

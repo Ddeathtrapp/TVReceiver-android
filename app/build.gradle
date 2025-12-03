@@ -3,6 +3,8 @@ plugins {
     id 'kotlin-android'
 }
 
+def signalingUrl = (project.findProperty("mirror.signalingUrl") ?: "wss://signaling.mirror.tv/ws") as String
+
 android {
     namespace 'com.mirror.tvreceiver'
     compileSdk 34
@@ -26,9 +28,13 @@ android {
     }
 
     buildTypes {
+        debug {
+            buildConfigField "String", "SIGNALING_URL", "\"${signalingUrl}\""
+        }
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            buildConfigField "String", "SIGNALING_URL", "\"${signalingUrl}\""
         }
     }
 
@@ -40,14 +46,18 @@ android {
     kotlinOptions {
         jvmTarget = "17"
     }
+
+    buildFeatures {
+        buildConfig true
+    }
 }
 
 dependencies {
     implementation 'androidx.core:core-ktx:1.12.0'
     implementation 'androidx.appcompat:appcompat:1.6.1'
+    implementation 'com.squareup.okhttp3:okhttp:4.12.0'
+    implementation 'org.webrtc:google-webrtc:1.0.32010'
 
     // Leanback UI components are only required for the dedicated TV flavor
     tvImplementation 'androidx.leanback:leanback:1.1.0-rc01'
-
-    // We will add WebRTC later
 }

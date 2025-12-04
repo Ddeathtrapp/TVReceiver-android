@@ -11,8 +11,8 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
+        // JitPack optional if you need it later
         maven { url "https://jitpack.io" }
-        maven { url "https://raw.githubusercontent.com/ALEXGREENCH/google-webrtc/master" }
     }
 }
 

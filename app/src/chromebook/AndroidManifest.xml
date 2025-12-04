@@ -8,19 +8,19 @@
         android:required="false"
         tools:replace="android:required" />
 
-    <application
-        tools:replace="android:banner">
-
+    <application tools:node="merge">
         <activity
             android:name=".MainActivity"
-            tools:replace="android:banner">
+            android:exported="true"
+            tools:node="merge">
 
-            <!-- Normal launcher for Chromebook -->
-            <intent-filter tools:replace="category">
+            <!-- Normal launcher entry for Chromebook -->
+            <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
 
         </activity>
     </application>
+
 </manifest>

@@ -1,0 +1,128 @@
+1<?xml version="1.0" encoding="utf-8"?>
+2<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+3    package="com.mirror.tvreceiver"
+4    android:versionCode="1"
+5    android:versionName="1.0" >
+6
+7    <uses-sdk
+8        android:minSdkVersion="26"
+9        android:targetSdkVersion="34" />
+10
+11    <uses-permission android:name="android.permission.INTERNET" />
+11-->/home/ddeathtrapp/TVReceiver-android/app/src/main/AndroidManifest.xml:5:5-67
+11-->/home/ddeathtrapp/TVReceiver-android/app/src/main/AndroidManifest.xml:5:22-64
+12    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+12-->/home/ddeathtrapp/TVReceiver-android/app/src/main/AndroidManifest.xml:6:5-79
+12-->/home/ddeathtrapp/TVReceiver-android/app/src/main/AndroidManifest.xml:6:22-76
+13    <uses-permission android:name="android.permission.WAKE_LOCK" />
+13-->/home/ddeathtrapp/TVReceiver-android/app/src/main/AndroidManifest.xml:7:5-68
+13-->/home/ddeathtrapp/TVReceiver-android/app/src/main/AndroidManifest.xml:7:22-65
+14
+15    <uses-feature
+15-->/home/ddeathtrapp/TVReceiver-android/app/src/main/AndroidManifest.xml:9:5-11:36
+16        android:name="android.hardware.camera"
+16-->/home/ddeathtrapp/TVReceiver-android/app/src/main/AndroidManifest.xml:10:9-47
+17        android:required="false" />
+17-->/home/ddeathtrapp/TVReceiver-android/app/src/main/AndroidManifest.xml:11:9-33
+18    <uses-feature
+18-->/home/ddeathtrapp/TVReceiver-android/app/src/main/AndroidManifest.xml:13:5-15:36
+19        android:name="android.hardware.camera.autofocus"
+19-->/home/ddeathtrapp/TVReceiver-android/app/src/main/AndroidManifest.xml:14:9-57
+20        android:required="false" />
+20-->/home/ddeathtrapp/TVReceiver-android/app/src/main/AndroidManifest.xml:15:9-33
+21
+22    <!-- Default: TV-style device (Chromebook overrides this in its own manifest) -->
+23    <uses-feature
+23-->/home/ddeathtrapp/TVReceiver-android/app/src/main/AndroidManifest.xml:18:5-20:35
+24        android:name="android.software.leanback"
+24-->/home/ddeathtrapp/TVReceiver-android/app/src/main/AndroidManifest.xml:19:9-49
+25        android:required="true" />
+25-->/home/ddeathtrapp/TVReceiver-android/app/src/main/AndroidManifest.xml:20:9-32
+26    <uses-feature
+26-->/home/ddeathtrapp/TVReceiver-android/app/src/main/AndroidManifest.xml:22:5-24:36
+27        android:name="android.hardware.touchscreen"
+27-->/home/ddeathtrapp/TVReceiver-android/app/src/main/AndroidManifest.xml:23:9-52
+28        android:required="false" />
+28-->/home/ddeathtrapp/TVReceiver-android/app/src/main/AndroidManifest.xml:24:9-33
+29
+30    <permission
+30-->[androidx.core:core:1.12.0] /home/ddeathtrapp/.gradle/caches/transforms-3/97e765d7646eda9d89caa6262cf470cb/transformed/core-1.12.0/AndroidManifest.xml:22:5-24:47
+31        android:name="com.mirror.tvreceiver.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION"
+31-->[androidx.core:core:1.12.0] /home/ddeathtrapp/.gradle/caches/transforms-3/97e765d7646eda9d89caa6262cf470cb/transformed/core-1.12.0/AndroidManifest.xml:23:9-81
+32        android:protectionLevel="signature" />
+32-->[androidx.core:core:1.12.0] /home/ddeathtrapp/.gradle/caches/transforms-3/97e765d7646eda9d89caa6262cf470cb/transformed/core-1.12.0/AndroidManifest.xml:24:9-44
+33
+34    <uses-permission android:name="com.mirror.tvreceiver.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION" />
+34-->[androidx.core:core:1.12.0] /home/ddeathtrapp/.gradle/caches/transforms-3/97e765d7646eda9d89caa6262cf470cb/transformed/core-1.12.0/AndroidManifest.xml:26:5-97
+34-->[androidx.core:core:1.12.0] /home/ddeathtrapp/.gradle/caches/transforms-3/97e765d7646eda9d89caa6262cf470cb/transformed/core-1.12.0/AndroidManifest.xml:26:22-94
+35
+36    <application
+36-->/home/ddeathtrapp/TVReceiver-android/app/src/main/AndroidManifest.xml:26:5-50:19
+37        android:allowBackup="true"
+37-->/home/ddeathtrapp/TVReceiver-android/app/src/main/AndroidManifest.xml:27:9-35
+38        android:appComponentFactory="androidx.core.app.CoreComponentFactory"
+38-->[androidx.core:core:1.12.0] /home/ddeathtrapp/.gradle/caches/transforms-3/97e765d7646eda9d89caa6262cf470cb/transformed/core-1.12.0/AndroidManifest.xml:28:18-86
+39        android:banner="@drawable/app_banner"
+39-->/home/ddeathtrapp/TVReceiver-android/app/src/main/AndroidManifest.xml:28:9-46
+40        android:debuggable="true"
+41        android:extractNativeLibs="true"
+42        android:icon="@mipmap/ic_launcher"
+42-->/home/ddeathtrapp/TVReceiver-android/app/src/main/AndroidManifest.xml:29:9-43
+43        android:label="TV Receiver"
+43-->/home/ddeathtrapp/TVReceiver-android/app/src/main/AndroidManifest.xml:30:9-36
+44        android:roundIcon="@mipmap/ic_launcher_round"
+44-->/home/ddeathtrapp/TVReceiver-android/app/src/main/AndroidManifest.xml:31:9-54
+45        android:supportsRtl="true"
+45-->/home/ddeathtrapp/TVReceiver-android/app/src/main/AndroidManifest.xml:32:9-35
+46        android:usesCleartextTraffic="true" >
+46-->/home/ddeathtrapp/TVReceiver-android/app/src/main/AndroidManifest.xml:33:9-44
+47        <activity
+47-->/home/ddeathtrapp/TVReceiver-android/app/src/main/AndroidManifest.xml:35:9-48:20
+48            android:name="com.mirror.tvreceiver.MainActivity"
+48-->/home/ddeathtrapp/TVReceiver-android/app/src/main/AndroidManifest.xml:36:13-41
+49            android:banner="@drawable/app_banner"
+49-->/home/ddeathtrapp/TVReceiver-android/app/src/main/AndroidManifest.xml:38:13-50
+50            android:exported="true"
+50-->/home/ddeathtrapp/TVReceiver-android/app/src/main/AndroidManifest.xml:37:13-36
+51            android:label="TV Receiver"
+51-->/home/ddeathtrapp/TVReceiver-android/app/src/main/AndroidManifest.xml:39:13-40
+52            android:launchMode="singleTask" >
+52-->/home/ddeathtrapp/TVReceiver-android/app/src/main/AndroidManifest.xml:40:13-44
+53
+54            <!-- TV flavor uses LEANBACK_LAUNCHER -->
+55            <intent-filter>
+55-->/home/ddeathtrapp/TVReceiver-android/app/src/main/AndroidManifest.xml:43:13-46:29
+56                <action android:name="android.intent.action.MAIN" />
+56-->/home/ddeathtrapp/TVReceiver-android/app/src/main/AndroidManifest.xml:44:17-69
+56-->/home/ddeathtrapp/TVReceiver-android/app/src/main/AndroidManifest.xml:44:25-66
+57
+58                <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
+58-->/home/ddeathtrapp/TVReceiver-android/app/src/main/AndroidManifest.xml:45:17-86
+58-->/home/ddeathtrapp/TVReceiver-android/app/src/main/AndroidManifest.xml:45:27-83
+59            </intent-filter>
+60        </activity>
+61
+62        <provider
+62-->[androidx.emoji2:emoji2:1.2.0] /home/ddeathtrapp/.gradle/caches/transforms-3/c133076759b52016ddca60deafee891e/transformed/jetified-emoji2-1.2.0/AndroidManifest.xml:24:9-32:20
+63            android:name="androidx.startup.InitializationProvider"
+63-->[androidx.emoji2:emoji2:1.2.0] /home/ddeathtrapp/.gradle/caches/transforms-3/c133076759b52016ddca60deafee891e/transformed/jetified-emoji2-1.2.0/AndroidManifest.xml:25:13-67
+64            android:authorities="com.mirror.tvreceiver.androidx-startup"
+64-->[androidx.emoji2:emoji2:1.2.0] /home/ddeathtrapp/.gradle/caches/transforms-3/c133076759b52016ddca60deafee891e/transformed/jetified-emoji2-1.2.0/AndroidManifest.xml:26:13-68
+65            android:exported="false" >
+65-->[androidx.emoji2:emoji2:1.2.0] /home/ddeathtrapp/.gradle/caches/transforms-3/c133076759b52016ddca60deafee891e/transformed/jetified-emoji2-1.2.0/AndroidManifest.xml:27:13-37
+66            <meta-data
+66-->[androidx.emoji2:emoji2:1.2.0] /home/ddeathtrapp/.gradle/caches/transforms-3/c133076759b52016ddca60deafee891e/transformed/jetified-emoji2-1.2.0/AndroidManifest.xml:29:13-31:52
+67                android:name="androidx.emoji2.text.EmojiCompatInitializer"
+67-->[androidx.emoji2:emoji2:1.2.0] /home/ddeathtrapp/.gradle/caches/transforms-3/c133076759b52016ddca60deafee891e/transformed/jetified-emoji2-1.2.0/AndroidManifest.xml:30:17-75
+68                android:value="androidx.startup" />
+68-->[androidx.emoji2:emoji2:1.2.0] /home/ddeathtrapp/.gradle/caches/transforms-3/c133076759b52016ddca60deafee891e/transformed/jetified-emoji2-1.2.0/AndroidManifest.xml:31:17-49
+69            <meta-data
+69-->[androidx.lifecycle:lifecycle-process:2.4.1] /home/ddeathtrapp/.gradle/caches/transforms-3/0a90329b42ae3ee4763f69c5c1b0a8c1/transformed/jetified-lifecycle-process-2.4.1/AndroidManifest.xml:31:13-33:52
+70                android:name="androidx.lifecycle.ProcessLifecycleInitializer"
+70-->[androidx.lifecycle:lifecycle-process:2.4.1] /home/ddeathtrapp/.gradle/caches/transforms-3/0a90329b42ae3ee4763f69c5c1b0a8c1/transformed/jetified-lifecycle-process-2.4.1/AndroidManifest.xml:32:17-78
+71                android:value="androidx.startup" />
+71-->[androidx.lifecycle:lifecycle-process:2.4.1] /home/ddeathtrapp/.gradle/caches/transforms-3/0a90329b42ae3ee4763f69c5c1b0a8c1/transformed/jetified-lifecycle-process-2.4.1/AndroidManifest.xml:33:17-49
+72        </provider>
+73    </application>
+74
+75</manifest>

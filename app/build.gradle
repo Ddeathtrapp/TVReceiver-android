@@ -73,6 +73,10 @@ dependencies {
     // OkHttp for signaling websocket
     implementation 'com.squareup.okhttp3:okhttp:4.12.0'
 
-    // WebRTC AAR pulled from mirror repository
+    // WebRTC core (video, sdp, peerconnection)
     implementation 'org.webrtc:google-webrtc:1.0.30039@aar'
+
+    // ✅ NEW: Add the missing audio module
+    implementation 'org.webrtc:google-webrtc-audio:1.0.30039@aar'
 }
+

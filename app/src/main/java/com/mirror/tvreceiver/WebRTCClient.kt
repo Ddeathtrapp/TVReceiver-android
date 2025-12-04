@@ -10,10 +10,8 @@ import okhttp3.Request
 import okhttp3.Response
 import okhttp3.WebSocket
 import okhttp3.WebSocketListener
-import okio.ByteString
-import org.json.JSONException
 import org.json.JSONObject
-import org.webrtc.AudioDeviceModule
+import org.webrtc.AudioSource
 import org.webrtc.DataChannel
 import org.webrtc.DefaultVideoDecoderFactory
 import org.webrtc.DefaultVideoEncoderFactory
@@ -25,122 +23,104 @@ import org.webrtc.MediaStream
 import org.webrtc.PeerConnection
 import org.webrtc.PeerConnectionFactory
 import org.webrtc.RtpReceiver
-import org.webrtc.RtpTransceiver
-import org.webrtc.SessionDescription
 import org.webrtc.SdpObserver
+import org.webrtc.SessionDescription
 import org.webrtc.SurfaceViewRenderer
 import org.webrtc.VideoTrack
 
-/**
- * Handles WebRTC peer connection lifecycle along with the websocket signaling channel.
- */
 class WebRTCClient(
-    context: Context,
-    private val eglBaseContext: EglBase.Context,
+    private val context: Context,
+    private val eglBase: EglBase,
+    private val listener: Listener,
     private val remoteRenderer: SurfaceViewRenderer,
-    private val signalingUrl: String,
-    private val listener: Listener? = null
-) : WebSocketListener() {
+    private val signalingUrl: String
+) {
 
     interface Listener {
-        fun onStatusChanged(status: Status)
-        fun onError(error: Throwable)
+        fun onConnected()
+        fun onDisconnected()
+        fun onError(message: String)
     }
 
-    enum class Status { CONNECTING, CONNECTED, DISCONNECTED }
-
     private val loggerTag = "WebRTCClient"
+    private val mainHandler = Handler(Looper.getMainLooper())
     private val okHttpClient = OkHttpClient.Builder()
         .retryOnConnectionFailure(true)
         .build()
-    private val mainHandler = Handler(Looper.getMainLooper())
-    private val audioDeviceModule: AudioDeviceModule
+
+    private val audioDeviceModule = JavaAudioDeviceModule.builder(context).createAudioDeviceModule()
     private val peerConnectionFactory: PeerConnectionFactory
-    private var peerConnection: PeerConnection? = null
+
     private var webSocket: WebSocket? = null
+    private var peerConnection: PeerConnection? = null
+    private var audioSource: AudioSource? = null
+    private var remoteVideoTrack: VideoTrack? = null
 
     init {
-        val initializationOptions = PeerConnectionFactory.InitializationOptions.builder(context)
-            .setEnableInternalTracer(true)
+        val initializationOptions = PeerConnectionFactory.InitializationOptions
+            .builder(context)
+            .setEnableInternalTracer(false)
             .createInitializationOptions()
         PeerConnectionFactory.initialize(initializationOptions)
 
-        audioDeviceModule = JavaAudioDeviceModule.builder(context).createAudioDeviceModule()
-
-        val encoderFactory = DefaultVideoEncoderFactory(
-            eglBaseContext,
-            /* enableIntelVp8Encoder */ true,
-            /* enableH264HighProfile */ true
-        )
-        val decoderFactory = DefaultVideoDecoderFactory(eglBaseContext)
+        val encoderFactory = DefaultVideoEncoderFactory(eglBase.eglBaseContext, true, true)
+        val decoderFactory = DefaultVideoDecoderFactory(eglBase.eglBaseContext)
 
         peerConnectionFactory = PeerConnectionFactory.builder()
             .setAudioDeviceModule(audioDeviceModule)
             .setVideoEncoderFactory(encoderFactory)
             .setVideoDecoderFactory(decoderFactory)
             .createPeerConnectionFactory()
+
+        audioSource = peerConnectionFactory.createAudioSource(MediaConstraints())
+
+        remoteRenderer.setEnableHardwareScaler(true)
+        remoteRenderer.setMirror(false)
     }
 
     fun connect() {
         if (webSocket != null) return
-        listener?.onStatusChanged(Status.CONNECTING)
         postToMain { ensurePeerConnection() }
         val request = Request.Builder()
             .url(signalingUrl)
             .build()
-        webSocket = okHttpClient.newWebSocket(request, this)
+        webSocket = okHttpClient.newWebSocket(request, signalingListener)
     }
 
     fun disconnect() {
         webSocket?.close(NORMAL_CLOSURE_STATUS, "client closing")
         webSocket = null
-        listener?.onStatusChanged(Status.DISCONNECTED)
+        postToMain { closePeerConnection() }
+        listener.onDisconnected()
     }
 
     fun release() {
         disconnect()
-        peerConnection?.dispose()
-        peerConnection = null
+        audioSource?.dispose()
+        audioSource = null
         audioDeviceModule.release()
         peerConnectionFactory.dispose()
-        okHttpClient.dispatcher.executorService.shutdown()
-        okHttpClient.connectionPool.evictAll()
-        PeerConnectionFactory.stopInternalTracingCapture()
-        PeerConnectionFactory.shutdownInternalTracer()
     }
 
-    override fun onOpen(webSocket: WebSocket, response: Response) {
-        listener?.onStatusChanged(Status.CONNECTED)
-        sendIdentify()
-    }
-
-    override fun onMessage(webSocket: WebSocket, text: String) {
-        try {
-            val message = JSONObject(text)
-            when (message.optString("type")) {
-                "offer" -> handleRemoteOffer(message.optString("sdp"))
-                "candidate" -> handleRemoteCandidate(message)
-                "ping" -> webSocket.send("""{"type":"pong"}""")
-            }
-        } catch (jsonError: JSONException) {
-            listener?.onError(jsonError)
-            Log.e(loggerTag, "Invalid signaling message: $text", jsonError)
+    private val signalingListener = object : WebSocketListener() {
+        override fun onOpen(webSocket: WebSocket, response: Response) {
+            listener.onConnected()
+            sendIdentify(webSocket)
         }
-    }
 
-    override fun onMessage(webSocket: WebSocket, bytes: ByteString) {
-        // Only text messages are expected from the signaling service.
-    }
+        override fun onMessage(webSocket: WebSocket, text: String) {
+            handleSignalingMessage(text)
+        }
 
-    override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
-        listener?.onStatusChanged(Status.DISCONNECTED)
-        this.webSocket = null
-    }
+        override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
+            this@WebRTCClient.webSocket = null
+            listener.onDisconnected()
+        }
 
-    override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
-        listener?.onError(t)
-        listener?.onStatusChanged(Status.DISCONNECTED)
-        this.webSocket = null
+        override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
+            this@WebRTCClient.webSocket = null
+            reportError("Signaling failure: ${t.message}")
+        }
     }
 
     private fun ensurePeerConnection() {
@@ -156,79 +136,85 @@ class WebRTCClient(
         }
 
         peerConnection = peerConnectionFactory.createPeerConnection(rtcConfig, object : PeerConnection.Observer {
-            override fun onIceCandidate(iceCandidate: IceCandidate) {
-                sendLocalCandidate(iceCandidate)
+            override fun onIceCandidate(candidate: IceCandidate) {
+                sendLocalCandidate(candidate)
             }
 
-            override fun onTrack(transceiver: RtpTransceiver?) {
-                val track = transceiver?.receiver?.track()
-                if (track is VideoTrack) {
-                    mainHandler.post {
-                        track.addSink(remoteRenderer)
-                    }
+            override fun onAddStream(stream: MediaStream) {
+                attachRemoteTrack(stream.videoTracks.firstOrNull())
+            }
+
+            override fun onAddTrack(receiver: RtpReceiver?, mediaStreams: Array<out MediaStream>?) {
+                attachRemoteTrack(receiver?.track() as? VideoTrack)
+            }
+
+            override fun onIceConnectionChange(newState: PeerConnection.IceConnectionState) {
+                Log.d(loggerTag, "ICE state: $newState")
+                if (newState == PeerConnection.IceConnectionState.DISCONNECTED ||
+                    newState == PeerConnection.IceConnectionState.FAILED ||
+                    newState == PeerConnection.IceConnectionState.CLOSED
+                ) {
+                    listener.onDisconnected()
                 }
             }
 
-            override fun onAddStream(stream: MediaStream?) {
-                val videoTrack = stream?.videoTracks?.firstOrNull()
-                videoTrack?.let { track ->
-                    mainHandler.post {
-                        track.addSink(remoteRenderer)
-                    }
-                }
-            }
-
-            override fun onIceConnectionChange(newState: PeerConnection.IceConnectionState?) {
-                Log.d(loggerTag, "ICE connection state: $newState")
-            }
-
-            override fun onConnectionChange(newState: PeerConnection.PeerConnectionState?) {
-                Log.d(loggerTag, "Peer connection state: $newState")
-            }
-
-            override fun onDataChannel(dataChannel: DataChannel?) {}
-            override fun onIceCandidatesRemoved(candidates: Array<out IceCandidate>?) {}
-            override fun onSignalingChange(newState: PeerConnection.SignalingState?) {}
-            override fun onIceGatheringChange(newState: PeerConnection.IceGatheringState?) {}
-            override fun onAddTrack(receiver: RtpReceiver?, mediaStreams: Array<out MediaStream>?) {}
-            override fun onRemoveStream(stream: MediaStream?) {}
-            override fun onStandardizedIceConnectionChange(newState: PeerConnection.IceConnectionState?) {}
-            override fun onSelectedCandidatePairChanged(event: PeerConnection.CandidatePairChangeEvent?) {}
+            override fun onSignalingChange(newState: PeerConnection.SignalingState) {}
+            override fun onIceConnectionReceivingChange(receiving: Boolean) {}
+            override fun onIceGatheringChange(newState: PeerConnection.IceGatheringState) {}
+            override fun onIceCandidatesRemoved(candidates: Array<IceCandidate>) {}
+            override fun onRemoveStream(stream: MediaStream) {}
+            override fun onDataChannel(dataChannel: DataChannel) {}
             override fun onRenegotiationNeeded() {}
         })
     }
 
-    private fun sendIdentify() {
-        val identifyPayload = JSONObject()
+    private fun handleSignalingMessage(message: String) {
+        runCatching { JSONObject(message) }
+            .onFailure { reportError("Invalid signaling message: ${it.message}") }
+            .onSuccess { json ->
+                when (json.optString("type")) {
+                    "offer" -> handleRemoteOffer(json.optString("sdp"))
+                    "candidate" -> handleRemoteCandidate(json)
+                    "ping" -> webSocket?.send("""{"type":"pong"}""")
+                }
+            }
+    }
+
+    private fun sendIdentify(webSocket: WebSocket) {
+        val payload = JSONObject()
             .put("type", "identify")
             .put("role", "receiver")
-            .put("platform", "android-tv")
+            .put("platform", "android")
             .put("model", Build.MODEL ?: "unknown")
             .put("manufacturer", Build.MANUFACTURER ?: "unknown")
-
-        if (webSocket?.send(identifyPayload.toString()) != true) {
-            listener?.onError(IllegalStateException("Unable to send identify handshake"))
-        }
+        webSocket.send(payload.toString())
     }
 
     private fun handleRemoteOffer(sdp: String?) {
-        if (sdp.isNullOrEmpty()) return
+        if (sdp.isNullOrEmpty()) {
+            reportError("Received empty SDP offer")
+            return
+        }
+
         postToMain {
             ensurePeerConnection()
-            val sessionDescription = SessionDescription(SessionDescription.Type.OFFER, sdp)
-            peerConnection?.setRemoteDescription(object : SimpleSdpObserver("setRemoteDescription") {
+            val offer = SessionDescription(SessionDescription.Type.OFFER, sdp)
+            peerConnection?.setRemoteDescription(object : LoggingSdpObserver("setRemoteDescription") {
                 override fun onSetSuccess() {
                     createAnswer()
                 }
-            }, sessionDescription)
+            }, offer)
         }
     }
 
-    private fun handleRemoteCandidate(candidateJson: JSONObject) {
-        val candidate = candidateJson.optString("candidate")
-        val sdpMid = candidateJson.optString("sdpMid")
-        val sdpMLineIndex = candidateJson.optInt("sdpMLineIndex")
-        if (candidate.isNullOrEmpty()) return
+    private fun handleRemoteCandidate(json: JSONObject) {
+        val candidate = json.optString("candidate")
+        val sdpMid = json.optString("sdpMid")
+        val sdpMLineIndex = json.optInt("sdpMLineIndex", -1)
+        if (candidate.isNullOrEmpty() || sdpMid.isNullOrEmpty() || sdpMLineIndex < 0) {
+            return
+        }
+
         postToMain {
             val iceCandidate = IceCandidate(sdpMid, sdpMLineIndex, candidate)
             peerConnection?.addIceCandidate(iceCandidate)
@@ -240,9 +226,10 @@ class WebRTCClient(
             mandatory.add(MediaConstraints.KeyValuePair("OfferToReceiveAudio", "true"))
             mandatory.add(MediaConstraints.KeyValuePair("OfferToReceiveVideo", "true"))
         }
-        peerConnection?.createAnswer(object : SimpleSdpObserver("createAnswer") {
+
+        peerConnection?.createAnswer(object : LoggingSdpObserver("createAnswer") {
             override fun onCreateSuccess(sessionDescription: SessionDescription) {
-                peerConnection?.setLocalDescription(object : SimpleSdpObserver("setLocalDescription") {
+                peerConnection?.setLocalDescription(object : LoggingSdpObserver("setLocalDescription") {
                     override fun onSetSuccess() {
                         sendAnswer(sessionDescription)
                     }
@@ -251,25 +238,52 @@ class WebRTCClient(
         }, constraints)
     }
 
-    private fun sendAnswer(sessionDescription: SessionDescription) {
+    private fun sendAnswer(description: SessionDescription) {
         val payload = JSONObject()
             .put("type", "answer")
-            .put("sdp", sessionDescription.description)
+            .put("sdp", description.description)
         if (webSocket?.send(payload.toString()) != true) {
-            listener?.onError(IllegalStateException("Unable to send answer"))
+            reportError("Unable to send answer")
         }
     }
 
-    private fun sendLocalCandidate(iceCandidate: IceCandidate) {
+    private fun sendLocalCandidate(candidate: IceCandidate) {
         val payload = JSONObject()
             .put("type", "candidate")
-            .put("candidate", iceCandidate.sdp)
-            .put("sdpMid", iceCandidate.sdpMid)
-            .put("sdpMLineIndex", iceCandidate.sdpMLineIndex)
+            .put("candidate", candidate.sdp)
+            .put("sdpMid", candidate.sdpMid)
+            .put("sdpMLineIndex", candidate.sdpMLineIndex)
         webSocket?.send(payload.toString())
     }
 
-    private open class SimpleSdpObserver(private val operation: String) : SdpObserver {
+    private fun attachRemoteTrack(videoTrack: VideoTrack?) {
+        if (videoTrack == null) return
+        remoteVideoTrack?.removeSink(remoteRenderer)
+        remoteVideoTrack = videoTrack
+        mainHandler.post { videoTrack.addSink(remoteRenderer) }
+    }
+
+    private fun closePeerConnection() {
+        remoteVideoTrack?.removeSink(remoteRenderer)
+        remoteVideoTrack = null
+        peerConnection?.close()
+        peerConnection = null
+    }
+
+    private fun reportError(message: String) {
+        Log.e(loggerTag, message)
+        listener.onError(message)
+    }
+
+    private fun postToMain(block: () -> Unit) {
+        if (Looper.myLooper() == Looper.getMainLooper()) {
+            block()
+        } else {
+            mainHandler.post(block)
+        }
+    }
+
+    private open class LoggingSdpObserver(private val operation: String) : SdpObserver {
         override fun onCreateSuccess(sessionDescription: SessionDescription) {}
         override fun onSetSuccess() {}
         override fun onCreateFailure(error: String) {
@@ -278,14 +292,6 @@ class WebRTCClient(
 
         override fun onSetFailure(error: String) {
             Log.e("WebRTCClient", "SDP set failed for $operation: $error")
-        }
-    }
-
-    private fun postToMain(action: () -> Unit) {
-        if (Looper.myLooper() == Looper.getMainLooper()) {
-            action()
-        } else {
-            mainHandler.post(action)
         }
     }
 

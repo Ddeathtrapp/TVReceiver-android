@@ -2,9 +2,7 @@ package com.mirror.tvreceiver
 
 import android.os.Bundle
 import android.util.Log
-import android.view.View
 import android.view.WindowManager
-import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import org.webrtc.EglBase
 import org.webrtc.SurfaceViewRenderer
@@ -12,69 +10,56 @@ import org.webrtc.SurfaceViewRenderer
 class MainActivity : AppCompatActivity(), WebRTCClient.Listener {
 
     private lateinit var eglBase: EglBase
-    private lateinit var surfaceViewRenderer: SurfaceViewRenderer
-    private lateinit var statusText: TextView
-    private var client: WebRTCClient? = null
+    private lateinit var remoteView: SurfaceViewRenderer
+    private lateinit var webrtcClient: WebRTCClient
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
-        // Inflate a simple layout in code so we don't need XML yet
-        val root = View.inflate(this, R.layout.activity_main, null)
-        setContentView(root)
+        setContentView(R.layout.activity_main)
 
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
-        surfaceViewRenderer = findViewById(R.id.video_view)
-        statusText = findViewById(R.id.status_text)
-
-        // Initialize EGL + WebRTC surface
+        remoteView = findViewById(R.id.remote_view)
         eglBase = EglBase.create()
-        surfaceViewRenderer.init(eglBase.eglBaseContext, null)
-        surfaceViewRenderer.setEnableHardwareScaler(true)
-        surfaceViewRenderer.setMirror(false)
+        remoteView.init(eglBase.eglBaseContext, null)
+        remoteView.setEnableHardwareScaler(true)
+        remoteView.setMirror(false)
 
-        // SIGNALING_URL is built from Gradle (see app/build.gradle)
-        val signalingUrl = BuildConfig.SIGNALING_URL
-        client = WebRTCClient(
+        webrtcClient = WebRTCClient(
             context = this,
             eglBase = eglBase,
-            signalingUrl = signalingUrl,
-            listener = this
-        ).also { it.attachRenderer(surfaceViewRenderer) }
-
-        onStatusChanged("Ready")
+            listener = this,
+            remoteRenderer = remoteView,
+            signalingUrl = BuildConfig.SIGNALING_URL
+        )
     }
 
     override fun onStart() {
         super.onStart()
-        client?.connect()
+        webrtcClient.connect()
     }
 
     override fun onStop() {
+        webrtcClient.disconnect()
         super.onStop()
-        client?.disconnect()
     }
 
     override fun onDestroy() {
-        super.onDestroy()
-        try {
-            client?.release()
-        } catch (t: Throwable) {
-            Log.w("MainActivity", "Error releasing WebRTCClient", t)
-        }
-        surfaceViewRenderer.release()
+        webrtcClient.release()
+        remoteView.release()
         eglBase.release()
+        super.onDestroy()
     }
 
-    override fun onStatusChanged(status: String) {
-        runOnUiThread {
-            statusText.text = status
-        }
+    override fun onConnected() {
+        Log.i("MainActivity", "Connected to signaling server")
     }
 
-    override fun onError(error: Throwable) {
-        Log.e("MainActivity", "WebRTC failure", error)
-        onStatusChanged("Error: ${error.message}")
+    override fun onDisconnected() {
+        Log.i("MainActivity", "Disconnected from signaling server")
+    }
+
+    override fun onError(message: String) {
+        Log.e("MainActivity", "WebRTC error: $message")
     }
 }

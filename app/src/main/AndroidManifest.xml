@@ -24,17 +24,15 @@
 
     <application
         android:allowBackup="true"
-        android:banner="@drawable/app_banner"
         android:icon="@mipmap/ic_launcher"
-        android:label="TV Receiver"
         android:roundIcon="@mipmap/ic_launcher_round"
+        android:label="TV Receiver"
         android:supportsRtl="true"
         android:usesCleartextTraffic="true">
 
         <activity
             android:name=".MainActivity"
             android:exported="true"
-            android:banner="@drawable/app_banner"
             android:label="TV Receiver"
             android:launchMode="singleTask">
 

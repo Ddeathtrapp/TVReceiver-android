@@ -3,8 +3,8 @@ plugins {
     id 'kotlin-android'
 }
 
-// Configurable signaling URL: override with -Pmirror.signalingUrl=wss://...
-def signalingUrl = (project.findProperty("mirror.signalingUrl") ?: "wss://signaling.mirror.tv/ws") as String
+// Choose signaling URL from CLI or gradle.properties
+def signalingUrl = (project.findProperty("mirror.signalingUrl") ?: "ws://192.168.1.100:8080") as String
 
 android {
     namespace 'com.mirror.tvreceiver'
@@ -18,7 +18,6 @@ android {
         versionName "1.0"
     }
 
-    // TV vs Chromebook flavors
     flavorDimensions "deviceType"
     productFlavors {
         tv {
@@ -31,14 +30,18 @@ android {
 
     buildTypes {
         debug {
-            // WebRTC client reads BuildConfig.SIGNALING_URL
             buildConfigField "String", "SIGNALING_URL", "\"${signalingUrl}\""
+            minifyEnabled false
         }
         release {
+            buildConfigField "String", "SIGNALING_URL", "\"${signalingUrl}\""
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
-            buildConfigField "String", "SIGNALING_URL", "\"${signalingUrl}\""
         }
+    }
+
+    buildFeatures {
+        buildConfig true
     }
 
     compileOptions {
@@ -49,22 +52,19 @@ android {
     kotlinOptions {
         jvmTarget = "17"
     }
-
-    buildFeatures {
-        buildConfig true
-    }
 }
 
 dependencies {
     implementation 'androidx.core:core-ktx:1.12.0'
     implementation 'androidx.appcompat:appcompat:1.6.1'
 
-    // Signaling WebSocket client
+    // Leanback UI for TV
+    tvImplementation 'androidx.leanback:leanback:1.1.0-rc01'
+
+    // OkHttp for signaling websocket
     implementation 'com.squareup.okhttp3:okhttp:4.12.0'
 
-    // WebRTC native library
-    implementation 'org.webrtc:google-webrtc:1.0.32010'
-
-    // Only the TV flavor actually needs Leanback UI
-    tvImplementation 'androidx.leanback:leanback:1.1.0-rc01'
+    // WORKING WebRTC version currently available in MavenCentral
+    implementation 'org.webrtc:google-webrtc:1.0.46275'
 }
+

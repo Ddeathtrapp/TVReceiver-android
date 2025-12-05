@@ -17,7 +17,6 @@ import org.webrtc.DefaultVideoDecoderFactory
 import org.webrtc.DefaultVideoEncoderFactory
 import org.webrtc.EglBase
 import org.webrtc.IceCandidate
-import org.webrtc.JavaAudioDeviceModule
 import org.webrtc.MediaConstraints
 import org.webrtc.MediaStream
 import org.webrtc.PeerConnection
@@ -27,6 +26,7 @@ import org.webrtc.SdpObserver
 import org.webrtc.SessionDescription
 import org.webrtc.SurfaceViewRenderer
 import org.webrtc.VideoTrack
+import org.webrtc.audio.JavaAudioDeviceModule
 
 class WebRTCClient(
     private val context: Context,
@@ -74,8 +74,7 @@ class WebRTCClient(
 
         audioSource = peerConnectionFactory.createAudioSource(MediaConstraints())
 
-        remoteRenderer.setEnableHardwareScaler(true)
-        remoteRenderer.setMirror(false)
+        configureRenderer(remoteRenderer)
     }
 
     fun connect() {
@@ -91,20 +90,23 @@ class WebRTCClient(
         webSocket?.close(NORMAL_CLOSURE_STATUS, "client closing")
         webSocket = null
         postToMain { closePeerConnection() }
-        listener.onDisconnected()
+        postToMain { listener.onDisconnected() }
     }
 
     fun release() {
         disconnect()
-        audioSource?.dispose()
+        runCatching { audioSource?.dispose() }
+            .onFailure { Log.w(loggerTag, "AudioSource dispose failed", it) }
         audioSource = null
-        audioDeviceModule.release()
-        peerConnectionFactory.dispose()
+        runCatching { audioDeviceModule.release() }
+            .onFailure { Log.w(loggerTag, "Audio device release failed", it) }
+        runCatching { peerConnectionFactory.dispose() }
+            .onFailure { Log.w(loggerTag, "PeerConnectionFactory dispose failed", it) }
     }
 
     private val signalingListener = object : WebSocketListener() {
         override fun onOpen(webSocket: WebSocket, response: Response) {
-            listener.onConnected()
+            postToMain { listener.onConnected() }
             sendIdentify(webSocket)
         }
 
@@ -114,7 +116,7 @@ class WebRTCClient(
 
         override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
             this@WebRTCClient.webSocket = null
-            listener.onDisconnected()
+            postToMain { listener.onDisconnected() }
         }
 
         override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
@@ -154,7 +156,7 @@ class WebRTCClient(
                     newState == PeerConnection.IceConnectionState.FAILED ||
                     newState == PeerConnection.IceConnectionState.CLOSED
                 ) {
-                    listener.onDisconnected()
+                    postToMain { listener.onDisconnected() }
                 }
             }
 
@@ -258,13 +260,21 @@ class WebRTCClient(
 
     private fun attachRemoteTrack(videoTrack: VideoTrack?) {
         if (videoTrack == null) return
-        remoteVideoTrack?.removeSink(remoteRenderer)
-        remoteVideoTrack = videoTrack
-        mainHandler.post { videoTrack.addSink(remoteRenderer) }
+        postToMain {
+            remoteVideoTrack?.let {
+                runCatching { it.removeSink(remoteRenderer) }
+                    .onFailure { error -> Log.w(loggerTag, "Failed to detach previous sink", error) }
+            }
+            remoteVideoTrack = videoTrack
+            videoTrack.addSink(remoteRenderer)
+        }
     }
 
     private fun closePeerConnection() {
-        remoteVideoTrack?.removeSink(remoteRenderer)
+        remoteVideoTrack?.let {
+            runCatching { it.removeSink(remoteRenderer) }
+                .onFailure { error -> Log.w(loggerTag, "Failed to remove sink", error) }
+        }
         remoteVideoTrack = null
         peerConnection?.close()
         peerConnection = null
@@ -272,7 +282,14 @@ class WebRTCClient(
 
     private fun reportError(message: String) {
         Log.e(loggerTag, message)
-        listener.onError(message)
+        postToMain { listener.onError(message) }
+    }
+
+    private fun configureRenderer(renderer: SurfaceViewRenderer) {
+        postToMain {
+            renderer.setEnableHardwareScaler(true)
+            renderer.setMirror(false)
+        }
     }
 
     private fun postToMain(block: () -> Unit) {

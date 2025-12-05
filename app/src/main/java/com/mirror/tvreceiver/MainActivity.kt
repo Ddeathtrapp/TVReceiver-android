@@ -9,45 +9,62 @@ import org.webrtc.SurfaceViewRenderer
 
 class MainActivity : AppCompatActivity(), WebRTCClient.Listener {
 
-    private lateinit var eglBase: EglBase
     private lateinit var remoteView: SurfaceViewRenderer
-    private lateinit var webrtcClient: WebRTCClient
+    private var eglBase: EglBase? = null
+    private var webrtcClient: WebRTCClient? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        window.setBackgroundDrawable(null)
 
         remoteView = findViewById(R.id.remote_view)
-        eglBase = EglBase.create()
-        remoteView.init(eglBase.eglBaseContext, null)
-        remoteView.setEnableHardwareScaler(true)
-        remoteView.setMirror(false)
+        remoteView.setZOrderMediaOverlay(false)
+        remoteView.setZOrderOnTop(false)
 
-        webrtcClient = WebRTCClient(
-            context = this,
-            eglBase = eglBase,
-            listener = this,
-            remoteRenderer = remoteView,
-            signalingUrl = BuildConfig.SIGNALING_URL
-        )
+        try {
+            eglBase = EglBase.create().also { base ->
+                remoteView.init(base.eglBaseContext, null)
+                remoteView.setEnableHardwareScaler(true)
+                remoteView.setMirror(false)
+            }
+        } catch (e: Exception) {
+            Log.e("MainActivity", "Renderer init failed", e)
+        }
+
+        eglBase?.let { base ->
+            webrtcClient = WebRTCClient(
+                context = this,
+                eglBase = base,
+                listener = this,
+                remoteRenderer = remoteView,
+                signalingUrl = BuildConfig.SIGNALING_URL
+            )
+        }
     }
 
     override fun onStart() {
         super.onStart()
-        webrtcClient.connect()
+        webrtcClient?.connect()
     }
 
     override fun onStop() {
-        webrtcClient.disconnect()
+        webrtcClient?.disconnect()
         super.onStop()
     }
 
     override fun onDestroy() {
-        webrtcClient.release()
-        remoteView.release()
-        eglBase.release()
+        webrtcClient?.release()
+        webrtcClient = null
+        try {
+            remoteView.release()
+        } catch (e: Exception) {
+            Log.w("MainActivity", "Error releasing remoteView", e)
+        }
+        eglBase?.release()
+        eglBase = null
         super.onDestroy()
     }
 

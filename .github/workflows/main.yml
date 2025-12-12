@@ -10,45 +10,40 @@ jobs:
     env:
       ANDROID_HOME: /usr/local/android-sdk
       ANDROID_SDK_ROOT: /usr/local/android-sdk
-      JAVA_HOME_17_X64: ${{ steps.setjava.outputs.path }}
 
     steps:
-    # 1. Checkout
     - name: Checkout
       uses: actions/checkout@v4
 
-    # 2. Install JDK 17
     - name: Set up JDK 17
-      id: setjava
       uses: actions/setup-java@v3
       with:
         distribution: 'temurin'
         java-version: '17'
 
-    # 3. Install Android SDK
     - name: Install Android SDK
-    run: |
-      sudo mkdir -p /usr/local/android-sdk/cmdline-tools
-      cd /usr/local/android-sdk/cmdline-tools
+      run: |
+        sudo mkdir -p /usr/local/android-sdk/cmdline-tools
+        cd /usr/local/android-sdk/cmdline-tools
 
-      wget https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip -O tools.zip
-      unzip tools.zip
-      mv cmdline-tools latest
+        wget https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip -O tools.zip
+        unzip tools.zip
+        mv cmdline-tools latest
 
-      echo "ANDROID_HOME=/usr/local/android-sdk" >> $GITHUB_ENV
-      echo "PATH=/usr/local/android-sdk/cmdline-tools/latest/bin:/usr/local/android-sdk/platform-tools:$PATH" >> $GITHUB_ENV
+        echo "ANDROID_HOME=/usr/local/android-sdk" >> $GITHUB_ENV
+        echo "PATH=/usr/local/android-sdk/cmdline-tools/latest/bin:/usr/local/android-sdk/platform-tools:$PATH" >> $GITHUB_ENV
 
-    # 4. Accept licenses + install required packages
-    - name: Install SDK Packages
+    - name: Accept Android SDK Licenses
       run: |
         yes | /usr/local/android-sdk/cmdline-tools/latest/bin/sdkmanager --licenses
+
+    - name: Install Android Packages
+      run: |
         /usr/local/android-sdk/cmdline-tools/latest/bin/sdkmanager "platform-tools" "platforms;android-34" "build-tools;34.0.0"
 
-    # 5. Build APKs
-    - name: Build APKs
+    - name: Build Debug APKs (TV + Chromebook)
       run: ./gradlew assembleTvDebug assembleChromebookDebug --stacktrace
 
-    # 6. Upload APKs
     - name: Upload TV APK
       uses: actions/upload-artifact@v4
       with:

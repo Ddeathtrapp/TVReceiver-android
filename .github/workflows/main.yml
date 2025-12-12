@@ -10,48 +10,62 @@ jobs:
     env:
       ANDROID_HOME: /usr/local/android-sdk
       ANDROID_SDK_ROOT: /usr/local/android-sdk
+      JAVA_HOME: /usr/lib/jvm/temurin-17-jdk-amd64
+      PATH: /usr/local/android-sdk/cmdline-tools/latest/bin:/usr/local/android-sdk/platform-tools:/usr/local/android-sdk/emulator:/usr/local/android-sdk/tools/bin:${PATH}
 
     steps:
     - name: Checkout
       uses: actions/checkout@v4
 
+    # Install JDK 17
     - name: Set up JDK 17
       uses: actions/setup-java@v3
       with:
         distribution: 'temurin'
         java-version: '17'
 
-    - name: Install Android SDK
+    # Install Android SDK (properly)
+    - name: Install Android SDK + cmdline-tools
       run: |
+        sudo rm -rf /usr/local/android-sdk
         sudo mkdir -p /usr/local/android-sdk/cmdline-tools
         cd /usr/local/android-sdk/cmdline-tools
+        sudo mkdir -p latest
 
-        wget https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip -O tools.zip
-        unzip tools.zip
-        mv cmdline-tools latest
+        # Download tools
+        wget https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip -O tools.zip
+        sudo unzip -qq tools.zip -d latest
+        sudo rm tools.zip
 
-        echo "ANDROID_HOME=/usr/local/android-sdk" >> $GITHUB_ENV
-        echo "PATH=/usr/local/android-sdk/cmdline-tools/latest/bin:/usr/local/android-sdk/platform-tools:$PATH" >> $GITHUB_ENV
+        # Accept licenses
+        yes | sudo /usr/local/android-sdk/cmdline-tools/latest/bin/sdkmanager --licenses
 
-    - name: Accept Android SDK Licenses
+        # Install required components
+        sudo /usr/local/android-sdk/cmdline-tools/latest/bin/sdkmanager \
+          "platform-tools" \
+          "build-tools;34.0.0" \
+          "platforms;android-34" \
+          "cmdline-tools;latest"
+
+    # Verify installation
+    - name: Verify Android SDK
       run: |
-        yes | /usr/local/android-sdk/cmdline-tools/latest/bin/sdkmanager --licenses
+        echo "SDK Root: $ANDROID_SDK_ROOT"
+        ls -R /usr/local/android-sdk
 
-    - name: Install Android Packages
+        which sdkmanager || echo "sdkmanager missing from PATH"
+        sdkmanager --version
+
+    # Build APKs
+    - name: Build Android APKs
       run: |
-        /usr/local/android-sdk/cmdline-tools/latest/bin/sdkmanager "platform-tools" "platforms;android-34" "build-tools;34.0.0"
+        chmod +x ./gradlew
+        ./gradlew assembleDebug --stacktrace --no-daemon
 
-    - name: Build Debug APKs (TV + Chromebook)
-      run: ./gradlew assembleTvDebug assembleChromebookDebug --stacktrace
-
-    - name: Upload TV APK
+    # Upload artifacts
+    - name: Upload APKs
       uses: actions/upload-artifact@v4
       with:
-        name: tv-debug-apk
-        path: app/build/outputs/apk/tv/debug/*.apk
-
-    - name: Upload Chromebook APK
-      uses: actions/upload-artifact@v4
-      with:
-        name: chromebook-debug-apk
-        path: app/build/outputs/apk/chromebook/debug/*.apk
+        name: built-apks
+        path: |
+          app/build/outputs/apk/**/*.apk

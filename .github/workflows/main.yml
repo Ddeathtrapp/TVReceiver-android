@@ -47,7 +47,7 @@ jobs:
 
       - name: Build APK
         run: |
-          export PATH=$PATH:$ANDROID_SDK/platform-tools:$ANDROID_SDK/cmdline-tools/latest/bin
+          export PATH=$PATH:$ANDROID_SDK/platform-tools:$ANDROID_SDK/cmdline-tools/latest/cmdline-tools/bin
           chmod +x ./gradlew
           ./gradlew assembleDebug --stacktrace --no-daemon
 
@@ -56,3 +56,4 @@ jobs:
         with:
           name: built-apks
           path: app/build/outputs/apk/**/*.apk
+              

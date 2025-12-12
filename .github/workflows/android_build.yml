@@ -28,6 +28,7 @@ jobs:
           ANDROID_SDK="$HOME/android-sdk"
           echo "ANDROID_SDK=$ANDROID_SDK" >> "$GITHUB_ENV"
           mkdir -p "$ANDROID_SDK/cmdline-tools"
+
           wget -nv https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip -O tools.zip
           unzip -qq tools.zip -d "$ANDROID_SDK/cmdline-tools"
           rm tools.zip

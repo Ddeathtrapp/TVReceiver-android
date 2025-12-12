@@ -14,55 +14,27 @@ jobs:
       - name: Install system packages
         run: |
           sudo apt-get update
-          sudo apt-get install -y tar unzip wget
+          sudo apt-get install -y unzip wget
 
-      - name: Install JDK 17
+      - name: Set up JDK 17
         uses: actions/setup-java@v3
         with:
           distribution: temurin
           java-version: 17
 
-      - name: Set ANDROID_SDK path
-        run: echo "ANDROID_SDK=$RUNNER_TEMP/android-sdk" >> $GITHUB_ENV
-
-      - name: Install Android SDK + cmdline-tools (isolated java)
-        shell: bash
+      - name: Use GitHub's built-in Android SDK
         run: |
-          set -e
+          echo "ANDROID_SDK=/usr/local/lib/android" >> $GITHUB_ENV
+          echo "sdk.dir=/usr/local/lib/android" > local.properties
+          ls /usr/local/lib/android
 
-          mkdir -p "$ANDROID_SDK/cmdline-tools"
-
-          wget -nv https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip -O tools.zip
-          unzip -qq tools.zip -d "$ANDROID_SDK/cmdline-tools"
-          rm tools.zip
-
-          if [ -d "$ANDROID_SDK/cmdline-tools/cmdline-tools" ]; then
-            mv "$ANDROID_SDK/cmdline-tools/cmdline-tools" "$ANDROID_SDK/cmdline-tools/latest"
-          else
-            mkdir -p "$ANDROID_SDK/cmdline-tools/latest"
-            mv "$ANDROID_SDK/cmdline-tools"/* "$ANDROID_SDK/cmdline-tools/latest/" 2>/dev/null
-          fi
-
-          export PATH="$PATH:$ANDROID_SDK/cmdline-tools/latest/bin:$ANDROID_SDK/cmdline-tools/latest/cmdline-tools/bin"
-
-          echo "=== Running sdkmanager inside subshell ==="
-          (
-            set -e
-            yes | sdkmanager --licenses
-            sdkmanager --no_https \
-              "platform-tools" \
-              "build-tools;34.0.0" \
-              "platforms;android-34"
-          ) || echo "sdkmanager returned nonzero"
-
-          echo "=== Killing all java processes from sdkmanager ==="
-          pkill -9 java || true
-          sleep 2
-          echo "Java cleanup complete"
-
-      - name: Build APK
-        shell: bash
+      - name: Build APK with Gradle
         run: |
-          export PATH="$PATH:$ANDROID_SDK/platform-tools:$ANDROID_SDK/cmdline-tools/latest/bin:$ANDROID_SDK/cmdline-tools/latest/cmdline-tools/bin"
           chmod +x ./gradlew
           ./gradlew assembleDebug --stacktrace --no-daemon
+
+      - name: Upload APKs
+        uses: actions/upload-artifact@v4
+        with:
+          name: built-apks
+          path: app/build/outputs/apk/**/*.apk

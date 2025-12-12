@@ -8,45 +8,68 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      # 1. Checkout the repo
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      # 2. Install system utilities
       - name: Install system packages
         run: |
           sudo apt-get update
           sudo apt-get install -y tar unzip wget
 
+      # 3. Install JDK 17
       - name: Set up JDK 17
         uses: actions/setup-java@v3
         with:
           distribution: temurin
           java-version: 17
 
+      # 4. Define ANDROID_SDK path
       - name: Define ANDROID_SDK path
         run: |
           echo "ANDROID_SDK=$RUNNER_TEMP/android-sdk" >> $GITHUB_ENV
           echo "ANDROID_HOME=$RUNNER_TEMP/android-sdk" >> $GITHUB_ENV
           echo "ANDROID_SDK_ROOT=$RUNNER_TEMP/android-sdk" >> $GITHUB_ENV
 
+      # 5. Install cmdline-tools + normalize folder structure
       - name: Install Android SDK + cmdline-tools
+        env:
+          ANDROID_SDK: ${{ env.ANDROID_SDK }}
         run: |
-          mkdir -p "$ANDROID_SDK/cmdline-tools/latest"
+          mkdir -p "$ANDROID_SDK/cmdline-tools"
+
+          # Download Google cmdline-tools
           wget https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip -O tools.zip
-          unzip -qq tools.zip -d "$ANDROID_SDK/cmdline-tools/latest"
+          unzip -qq tools.zip -d "$ANDROID_SDK/cmdline-tools"
           rm tools.zip
 
-          export PATH="$PATH:$ANDROID_SDK/cmdline-tools/latest/cmdline-tools/bin"
+          # Fix Google’s broken ZIP layout by normalizing structure
+          if [ -d "$ANDROID_SDK/cmdline-tools/cmdline-tools" ]; then
+            mv "$ANDROID_SDK/cmdline-tools/cmdline-tools" "$ANDROID_SDK/cmdline-tools/latest"
+          else
+            # e.g. if it unzips into cmdline-tools/bin
+            mkdir -p "$ANDROID_SDK/cmdline-tools/latest"
+            mv "$ANDROID_SDK/cmdline-tools"/* "$ANDROID_SDK/cmdline-tools/latest/" || true
+          fi
 
+          # Add ALL possible binary paths
+          export PATH="$PATH:$ANDROID_SDK/cmdline-tools/latest/bin:$ANDROID_SDK/cmdline-tools/latest/cmdline-tools/bin"
+
+          # Accept licenses
           yes | sdkmanager --licenses
 
+          # Install required components
           sdkmanager "platform-tools" "build-tools;34.0.0" "platforms;android-34"
 
+      # 6. Build your app with Gradle
       - name: Build APK
         run: |
-          export PATH="$PATH:$ANDROID_SDK/platform-tools:$ANDROID_SDK/cmdline-tools/latest/cmdline-tools/bin"
+          export PATH="$PATH:$ANDROID_SDK/platform-tools:$ANDROID_SDK/cmdline-tools/latest/bin:$ANDROID_SDK/cmdline-tools/latest/cmdline-tools/bin"
           chmod +x ./gradlew
           ./gradlew assembleDebug --stacktrace --no-daemon
 
+      # 7. Upload the APK artifacts
       - name: Upload APKs
         uses: actions/upload-artifact@v4
         with:

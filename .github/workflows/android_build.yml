@@ -26,31 +26,50 @@ jobs:
         run: |
           echo "ANDROID_SDK=$RUNNER_TEMP/android-sdk" >> $GITHUB_ENV
 
-      - name: Install Android SDK + cmdline-tools
+      - name: Install Android SDK + cmdline-tools (error safe)
+        shell: bash
         run: |
+          set +e   # <-- TURN OFF FAIL-FAST TO SEE ERRORS
+          
+          echo "ANDROID_SDK = $ANDROID_SDK"
+
           mkdir -p "$ANDROID_SDK/cmdline-tools"
 
-          wget https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip -O tools.zip
+          wget -nv https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip -O tools.zip
           unzip -qq tools.zip -d "$ANDROID_SDK/cmdline-tools"
           rm tools.zip
+
+          echo "--- After unzip directory tree:"
+          ls -R "$ANDROID_SDK/cmdline-tools"
 
           # Normalize folder structure
           if [ -d "$ANDROID_SDK/cmdline-tools/cmdline-tools" ]; then
             mv "$ANDROID_SDK/cmdline-tools/cmdline-tools" "$ANDROID_SDK/cmdline-tools/latest"
           else
             mkdir -p "$ANDROID_SDK/cmdline-tools/latest"
-            mv "$ANDROID_SDK/cmdline-tools"/* "$ANDROID_SDK/cmdline-tools/latest/" || true
+            mv "$ANDROID_SDK/cmdline-tools"/* "$ANDROID_SDK/cmdline-tools/latest/" 2>/dev/null
           fi
+
+          echo "--- After normalize directory tree:"
+          ls -R "$ANDROID_SDK/cmdline-tools"
 
           export PATH="$PATH:$ANDROID_SDK/cmdline-tools/latest/bin:$ANDROID_SDK/cmdline-tools/latest/cmdline-tools/bin"
 
-          yes | sdkmanager --licenses
+          echo "--- Running sdkmanager --licenses"
+          yes | sdkmanager --licenses || echo "sdkmanager license error occurred"
 
+          echo "--- Installing Android packages"
           sdkmanager "platform-tools" "build-tools;34.0.0" "platforms;android-34"
+          echo "sdkmanager exit code: $?"
+
+          echo "--- SDK Install complete"
+
+          set -e   # <-- RESTORE FAIL-FAST
 
       - name: Build APK
+        shell: bash
         run: |
+          echo "Android SDK path = $ANDROID_SDK"
           export PATH="$PATH:$ANDROID_SDK/platform-tools:$ANDROID_SDK/cmdline-tools/latest/bin:$ANDROID_SDK/cmdline-tools/latest/cmdline-tools/bin"
-          echo "ENV SDK PATH: $ANDROID_SDK"
           chmod +x ./gradlew
           ./gradlew assembleDebug --stacktrace --no-daemon

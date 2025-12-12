@@ -8,11 +8,8 @@ jobs:
     runs-on: ubuntu-latest
 
     env:
-      # The env variables below will be set by the Install Android SDK step,
-      # but they are defined here for clarity/scoping if needed elsewhere.
       ANDROID_HOME: /usr/local/android-sdk
       ANDROID_SDK_ROOT: /usr/local/android-sdk
-      # This variable is set by the setup-java step
       JAVA_HOME_17_X64: ${{ steps.setjava.outputs.path }}
 
     steps:
@@ -30,23 +27,20 @@ jobs:
 
     # 3. Install Android SDK
     - name: Install Android SDK
-      run: |
-        sudo mkdir -p /usr/local/android-sdk/cmdline-tools
-        cd /usr/local/android-sdk/cmdline-tools
+    run: |
+      sudo mkdir -p /usr/local/android-sdk/cmdline-tools
+      cd /usr/local/android-sdk/cmdline-tools
 
-        wget https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip -O tools.zip
-        unzip tools.zip
-        mv cmdline-tools latest
+      wget https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip -O tools.zip
+      unzip tools.zip
+      mv cmdline-tools latest
 
-        # Export environment variables for subsequent steps
-        echo "ANDROID_HOME=/usr/local/android-sdk" >> $GITHUB_ENV
-        echo "ANDROID_SDK_ROOT=/usr/local/android-sdk" >> $GITHUB_ENV
-        echo "PATH=/usr/local/android-sdk/cmdline-tools/latest/bin:/usr/local/android-sdk/platform-tools:$PATH" >> $GITHUB_ENV
+      echo "ANDROID_HOME=/usr/local/android-sdk" >> $GITHUB_ENV
+      echo "PATH=/usr/local/android-sdk/cmdline-tools/latest/bin:/usr/local/android-sdk/platform-tools:$PATH" >> $GITHUB_ENV
 
     # 4. Accept licenses + install required packages
     - name: Install SDK Packages
       run: |
-        # Use a relative path now that the PATH is set, or stick to the absolute path
         yes | /usr/local/android-sdk/cmdline-tools/latest/bin/sdkmanager --licenses
         /usr/local/android-sdk/cmdline-tools/latest/bin/sdkmanager "platform-tools" "platforms;android-34" "build-tools;34.0.0"
 
@@ -54,7 +48,7 @@ jobs:
     - name: Build APKs
       run: ./gradlew assembleTvDebug assembleChromebookDebug --stacktrace
 
-    # 6. Upload TV APK
+    # 6. Upload APKs
     - name: Upload TV APK
       uses: actions/upload-artifact@v4
       with:

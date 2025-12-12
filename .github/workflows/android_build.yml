@@ -23,12 +23,13 @@ jobs:
           java-version: 17
 
       - name: Set ANDROID_SDK path
-        run: |
-          echo "ANDROID_SDK=$RUNNER_TEMP/android-sdk" >> $GITHUB_ENV
+        run: echo "ANDROID_SDK=$RUNNER_TEMP/android-sdk" >> $GITHUB_ENV
 
-      - name: Install Android SDK + cmdline-tools
+      - name: Install Android SDK + cmdline-tools (isolated java)
+        shell: bash
         run: |
-          set +e
+          set -e
+
           mkdir -p "$ANDROID_SDK/cmdline-tools"
 
           wget -nv https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip -O tools.zip
@@ -44,18 +45,23 @@ jobs:
 
           export PATH="$PATH:$ANDROID_SDK/cmdline-tools/latest/bin:$ANDROID_SDK/cmdline-tools/latest/cmdline-tools/bin"
 
-          yes | sdkmanager --licenses || true
+          echo "=== Running sdkmanager inside subshell ==="
+          (
+            set -e
+            yes | sdkmanager --licenses
+            sdkmanager --no_https \
+              "platform-tools" \
+              "build-tools;34.0.0" \
+              "platforms;android-34"
+          ) || echo "sdkmanager returned nonzero"
 
-          sdkmanager "platform-tools" "build-tools;34.0.0" "platforms;android-34" || true
-
-          set -e
-
-      - name: Kill leftover Java processes (important!)
-        run: |
-          echo "Cleaning up leftover java processes..."
-          pgrep java && pkill java || echo "No java processes running."
+          echo "=== Killing all java processes from sdkmanager ==="
+          pkill -9 java || true
+          sleep 2
+          echo "Java cleanup complete"
 
       - name: Build APK
+        shell: bash
         run: |
           export PATH="$PATH:$ANDROID_SDK/platform-tools:$ANDROID_SDK/cmdline-tools/latest/bin:$ANDROID_SDK/cmdline-tools/latest/cmdline-tools/bin"
           chmod +x ./gradlew

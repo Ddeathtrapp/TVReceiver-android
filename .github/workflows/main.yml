@@ -10,21 +10,23 @@ jobs:
     env:
       ANDROID_HOME: /usr/local/android-sdk
       ANDROID_SDK_ROOT: /usr/local/android-sdk
-      JAVA_HOME: /usr/lib/jvm/temurin-17-jdk-amd64
-      PATH: /usr/local/android-sdk/cmdline-tools/latest/bin:/usr/local/android-sdk/platform-tools:/usr/local/android-sdk/emulator:/usr/local/android-sdk/tools/bin:${PATH}
 
     steps:
-    - name: Checkout
+    # --- Fix tar missing ---
+    - name: Install required system packages
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y tar unzip wget
+
+    - name: Checkout repository
       uses: actions/checkout@v4
 
-    # Install JDK 17
     - name: Set up JDK 17
       uses: actions/setup-java@v3
       with:
         distribution: 'temurin'
         java-version: '17'
 
-    # Install Android SDK (properly)
     - name: Install Android SDK + cmdline-tools
       run: |
         sudo rm -rf /usr/local/android-sdk
@@ -32,40 +34,28 @@ jobs:
         cd /usr/local/android-sdk/cmdline-tools
         sudo mkdir -p latest
 
-        # Download tools
         wget https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip -O tools.zip
         sudo unzip -qq tools.zip -d latest
         sudo rm tools.zip
 
-        # Accept licenses
+        export PATH=$PATH:/usr/local/android-sdk/cmdline-tools/latest/bin
+
         yes | sudo /usr/local/android-sdk/cmdline-tools/latest/bin/sdkmanager --licenses
 
-        # Install required components
         sudo /usr/local/android-sdk/cmdline-tools/latest/bin/sdkmanager \
           "platform-tools" \
           "build-tools;34.0.0" \
           "platforms;android-34" \
           "cmdline-tools;latest"
 
-    # Verify installation
-    - name: Verify Android SDK
+    - name: Build APKs
       run: |
-        echo "SDK Root: $ANDROID_SDK_ROOT"
-        ls -R /usr/local/android-sdk
-
-        which sdkmanager || echo "sdkmanager missing from PATH"
-        sdkmanager --version
-
-    # Build APKs
-    - name: Build Android APKs
-      run: |
+        export PATH=$PATH:/usr/local/android-sdk/platform-tools:/usr/local/android-sdk/cmdline-tools/latest/bin
         chmod +x ./gradlew
         ./gradlew assembleDebug --stacktrace --no-daemon
 
-    # Upload artifacts
     - name: Upload APKs
       uses: actions/upload-artifact@v4
       with:
         name: built-apks
-        path: |
-          app/build/outputs/apk/**/*.apk
+        path: app/build/outputs/apk/**/*.apk

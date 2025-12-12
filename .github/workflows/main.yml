@@ -8,50 +8,54 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout
-      uses: actions/checkout@v4
+    # 1. Checkout repository
+    - uses: actions/checkout@v4
 
+    # 2. Install JDK 17
     - name: Set up JDK 17
       uses: actions/setup-java@v3
       with:
-        distribution: 'temurin'
-        java-version: '17'
+        distribution: temurin
+        java-version: 17
 
-    - name: Install Android SDK (Proper Structure)
+    # 3. Install Android SDK + cmdline-tools
+    - name: Install Android SDK
       run: |
         sudo mkdir -p /usr/local/android-sdk
         sudo chown $USER:$USER /usr/local/android-sdk
         cd /usr/local/android-sdk
-        
+
         wget https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip -O tools.zip
-        unzip tools.zip
-        
-        # Fix folder structure required by sdkmanager
-        mkdir -p cmdline-tools/latest
-        mv cmdline-tools/* cmdline-tools/latest/ 2>/dev/null || true
-        
+        unzip tools.zip -d cmdline-tools
+        mv cmdline-tools/cmdline-tools cmdline-tools/latest
+
         echo "ANDROID_HOME=/usr/local/android-sdk" >> $GITHUB_ENV
         echo "PATH=/usr/local/android-sdk/cmdline-tools/latest/bin:/usr/local/android-sdk/platform-tools:$PATH" >> $GITHUB_ENV
 
-    - name: Install SDK Packages
+    # 4. Accept licenses AFTER PATH is exported
+    - name: Accept Licenses
       run: |
         yes | /usr/local/android-sdk/cmdline-tools/latest/bin/sdkmanager --licenses
-        /usr/local/android-sdk/cmdline-tools/latest/bin/sdkmanager \
-          "platform-tools" \
-          "platforms;android-34" \
-          "build-tools;34.0.0"
 
+    # 5. Install required SDK packages
+    - name: Install Platforms & Tools
+      run: |
+        /usr/local/android-sdk/cmdline-tools/latest/bin/sdkmanager "platforms;android-34"
+        /usr/local/android-sdk/cmdline-tools/latest/bin/sdkmanager "build-tools;34.0.0"
+        /usr/local/android-sdk/cmdline-tools/latest/bin/sdkmanager "platform-tools"
+
+    # 6. Build both APKs
     - name: Build APKs
       run: ./gradlew assembleTvDebug assembleChromebookDebug --stacktrace
 
-    - name: Upload TV APK
-      uses: actions/upload-artifact@v4
+    # 7. Upload (TV)
+    - uses: actions/upload-artifact@v4
       with:
         name: tv-debug-apk
         path: app/build/outputs/apk/tv/debug/*.apk
 
-    - name: Upload Chromebook APK
-      uses: actions/upload-artifact@v4
+    # 8. Upload (Chromebook)
+    - uses: actions/upload-artifact@v4
       with:
         name: chromebook-debug-apk
         path: app/build/outputs/apk/chromebook/debug/*.apk
